@@ -223,7 +223,7 @@ async def convert_start(
     background_tasks: BackgroundTasks,
     tool_id: str = Form(...),
     url: Optional[str] = Form(None),
-    files: Optional[List[UploadFile]] = File(None),
+    files: Optional[UploadFile] = File(None),
     output_format: str = Form("mp3")
 ):
     task_id = str(uuid.uuid4())
@@ -231,7 +231,8 @@ async def convert_start(
 
     fnames = []
     if files:
-        for f in files:
+        files_list = files if isinstance(files, list) else [files]
+        for f in files_list:
             safe_name = pathlib.Path(f.filename).name
             file_path = os.path.join(BASE_TEMP_DIR, task_id, "input", safe_name)
             with open(file_path, "wb") as buf:
