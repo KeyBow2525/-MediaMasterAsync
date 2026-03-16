@@ -93,6 +93,7 @@
                     formData.append('output_format', youtubeFormat);
                 } else {
                     files.forEach(file => formData.append('files', file));
+                    formData.append('output_format', 'mp3');
                 }
 
                 try {
