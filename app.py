@@ -157,18 +157,11 @@ def process_task(task_id: str, tool_id: str, url_text: str, filenames: List[str]
                 tasks[task_id]["progress"] = int(20 + (i / len(filenames)) * 60)
 
                 if tool_id == 'heic-jpg':
+                    from pillow_heif import register_heif_opener
+                    register_heif_opener()
                     out_f = os.path.join(output_path, f"{os.path.splitext(fname)[0]}.jpg")
-                    subprocess.run(
-                        [
-                            "ffmpeg", "-y",
-                            "-i", in_f,
-                            "-vf", "zscale=transfer=709,format=yuv420p",
-                            "-q:v", "2",
-                            out_f
-                        ],
-                        check=True,
-                        capture_output=True
-                    )
+                    img = Image.open(in_f)
+                    img.convert('RGB').save(out_f, 'JPEG', quality=95)
 
                 elif tool_id in ['m4a-mp3', 'mp4-mp3']:
                     audio = AudioSegment.from_file(in_f)
