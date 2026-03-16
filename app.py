@@ -157,8 +157,6 @@ def process_task(task_id: str, tool_id: str, url_text: str, filenames: List[str]
                 tasks[task_id]["progress"] = int(20 + (i / len(filenames)) * 60)
 
                 if tool_id == 'heic-jpg':
-                    from pillow_heif import register_heif_opener
-                    register_heif_opener()
                     out_f = os.path.join(output_path, f"{os.path.splitext(fname)[0]}.jpg")
                     img = Image.open(in_f)
                     img.convert('RGB').save(out_f, 'JPEG', quality=95)
