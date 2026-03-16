@@ -162,7 +162,8 @@ def process_task(task_id: str, tool_id: str, url_text: str, filenames: List[str]
                         [
                             "ffmpeg", "-y",
                             "-i", in_f,
-                            "-pix_fmt", "yuvj420p",
+                            "-vf", "zscale=transfer=709,format=yuv420p",
+                            "-q:v", "2",
                             out_f
                         ],
                         check=True,
