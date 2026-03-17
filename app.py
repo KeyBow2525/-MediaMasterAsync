@@ -251,7 +251,7 @@ async def convert_start(
     background_tasks: BackgroundTasks,
     tool_id: str = Form(...),
     url: Optional[str] = Form(None),
-    files: Optional[List[UploadFile]] = File(None),
+    files: List[UploadFile] = File(default=[]),
     output_format: str = Form("mp3")
 ):
     task_id = str(uuid.uuid4())
