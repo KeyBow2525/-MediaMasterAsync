@@ -12,8 +12,12 @@ import sqlite3
 import subprocess
 from pydub import AudioSegment
 from PIL import Image
-from pillow_heif import register_heif_opener
-register_heif_opener()
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    PILLOW_HEIF_AVAILABLE = True
+except Exception:
+    PILLOW_HEIF_AVAILABLE = False
 from pdf2image import convert_from_path
 import pathlib
 import asyncio
@@ -160,8 +164,24 @@ def process_task(task_id: str, tool_id: str, url_text: str, filenames: List[str]
 
                 if tool_id == 'heic-jpg':
                     out_f = os.path.join(output_path, f"{os.path.splitext(fname)[0]}.jpg")
-                    img = Image.open(in_f)
-                    img.convert('RGB').save(out_f, 'JPEG', quality=95)
+                    converted = False
+                    # まずImageMagickで試みる（最も確実）
+                    try:
+                        result = subprocess.run(
+                            ["convert", in_f, "-quality", "95", out_f],
+                            capture_output=True, timeout=60
+                        )
+                        if result.returncode == 0 and os.path.exists(out_f):
+                            converted = True
+                    except Exception:
+                        pass
+                    # フォールバック: pillow-heif
+                    if not converted and PILLOW_HEIF_AVAILABLE:
+                        img = Image.open(in_f)
+                        img.convert('RGB').save(out_f, 'JPEG', quality=95)
+                        converted = True
+                    if not converted:
+                        raise Exception(f"HEIC変換に失敗しました: {fname}。ImageMagickおよびpillow-heifが利用できません。")
 
                 elif tool_id in ['m4a-mp3', 'mp4-mp3']:
                     audio = AudioSegment.from_file(in_f)
