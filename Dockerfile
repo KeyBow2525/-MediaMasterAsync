@@ -15,7 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libheif1 \
     libffi-dev \
     gcc \
+    imagemagick \
+    libmagickwand-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# ImageMagickのHEIC読み取り制限を解除
+RUN sed -i 's/<policy domain="coder" rights="none" pattern="HEIC" \/>/<!-- HEIC allowed -->/' /etc/ImageMagick-6/policy.xml 2>/dev/null || true && \
+    sed -i 's/<policy domain="coder" rights="none" pattern="HEIF" \/>/<!-- HEIF allowed -->/' /etc/ImageMagick-6/policy.xml 2>/dev/null || true
 
 WORKDIR /app
 
