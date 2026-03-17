@@ -157,44 +157,54 @@ def process_task(task_id: str, tool_id: str, url_text: str, filenames: List[str]
 
         # 通常のメディア変換処理
         else:
-            for i, fname in enumerate(filenames):
-                in_f = os.path.join(input_path, fname)
-                tasks[task_id]["last_log"] = f"処理中: {fname}"
-                tasks[task_id]["progress"] = int(20 + (i / len(filenames)) * 60)
-
-                if tool_id == 'heic-jpg':
-                    out_f = os.path.join(output_path, f"{os.path.splitext(fname)[0]}.jpg")
-                    converted = False
-                    # まずImageMagickで試みる（最も確実）
-                    try:
-                        result = subprocess.run(
-                            ["convert", in_f, "-quality", "95", out_f],
-                            capture_output=True, timeout=60
-                        )
-                        if result.returncode == 0 and os.path.exists(out_f):
-                            converted = True
-                    except Exception:
-                        pass
-                    # フォールバック: pillow-heif
-                    if not converted and PILLOW_HEIF_AVAILABLE:
-                        img = Image.open(in_f)
-                        img.convert('RGB').save(out_f, 'JPEG', quality=95)
-                        converted = True
-                    if not converted:
-                        raise Exception(f"HEIC変換に失敗しました: {fname}。ImageMagickおよびpillow-heifが利用できません。")
-
-                elif tool_id in ['m4a-mp3', 'mp4-mp3']:
-                    audio = AudioSegment.from_file(in_f)
-                    audio.export(os.path.join(output_path, f"{os.path.splitext(fname)[0]}.mp3"), format="mp3")
-
-                elif tool_id == 'jpeg-pdf':
+            # jpeg-pdf は全ファイルをまとめて1つのPDFに結合
+            if tool_id == 'jpeg-pdf':
+                imgs = []
+                for fname in filenames:
+                    in_f = os.path.join(input_path, fname)
                     img = Image.open(in_f).convert('RGB')
-                    img.save(os.path.join(output_path, f"{os.path.splitext(fname)[0]}.pdf"), "PDF")
+                    imgs.append(img)
+                if not imgs:
+                    raise Exception("変換対象の画像がありません")
+                out_pdf = os.path.join(output_path, "output.pdf")
+                imgs[0].save(out_pdf, "PDF", save_all=True, append_images=imgs[1:])
+                tasks[task_id]["progress"] = 80
 
-                elif tool_id == 'pdf-png':
-                    images = convert_from_path(in_f)
-                    for j, image in enumerate(images):
-                        image.save(os.path.join(output_path, f"{os.path.splitext(fname)[0]}_{j}.png"), "PNG")
+            else:
+                for i, fname in enumerate(filenames):
+                    in_f = os.path.join(input_path, fname)
+                    tasks[task_id]["last_log"] = f"処理中: {fname}"
+                    tasks[task_id]["progress"] = int(20 + (i / len(filenames)) * 60)
+
+                    if tool_id == 'heic-jpg':
+                        out_f = os.path.join(output_path, f"{os.path.splitext(fname)[0]}.jpg")
+                        converted = False
+                        # まずImageMagickで試みる（最も確実）
+                        try:
+                            result = subprocess.run(
+                                ["convert", in_f, "-quality", "95", out_f],
+                                capture_output=True, timeout=60
+                            )
+                            if result.returncode == 0 and os.path.exists(out_f):
+                                converted = True
+                        except Exception:
+                            pass
+                        # フォールバック: pillow-heif
+                        if not converted and PILLOW_HEIF_AVAILABLE:
+                            img = Image.open(in_f)
+                            img.convert('RGB').save(out_f, 'JPEG', quality=95)
+                            converted = True
+                        if not converted:
+                            raise Exception(f"HEIC変換に失敗しました: {fname}。ImageMagickおよびpillow-heifが利用できません。")
+
+                    elif tool_id in ['m4a-mp3', 'mp4-mp3']:
+                        audio = AudioSegment.from_file(in_f)
+                        audio.export(os.path.join(output_path, f"{os.path.splitext(fname)[0]}.mp3"), format="mp3")
+
+                    elif tool_id == 'pdf-png':
+                        images = convert_from_path(in_f)
+                        for j, image in enumerate(images):
+                            image.save(os.path.join(output_path, f"{os.path.splitext(fname)[0]}_{j}.png"), "PNG")
 
         # 結果をZIPにまとめる
         tasks[task_id]["last_log"] = "ファイルを圧縮中..."
@@ -241,16 +251,19 @@ async def convert_start(
     background_tasks: BackgroundTasks,
     tool_id: str = Form(...),
     url: Optional[str] = Form(None),
-    files: Optional[UploadFile] = File(None),
+    files: Optional[List[UploadFile]] = File(None),
     output_format: str = Form("mp3")
 ):
     task_id = str(uuid.uuid4())
     os.makedirs(os.path.join(BASE_TEMP_DIR, task_id, "input"), exist_ok=True)
 
+    # 空リストはNoneとして扱う
+    if files is not None and len(files) == 0:
+        files = None
+
     fnames = []
     if files:
-        files_list = files if isinstance(files, list) else [files]
-        for f in files_list:
+        for f in files:
             safe_name = pathlib.Path(f.filename).name
             file_path = os.path.join(BASE_TEMP_DIR, task_id, "input", safe_name)
             with open(file_path, "wb") as buf:
